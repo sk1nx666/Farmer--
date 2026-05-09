@@ -5,10 +5,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.commands.arguments.EntityAnchorArgument.Anchor;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -22,6 +23,7 @@ import net.minecraft.world.phys.Vec3;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -31,25 +33,16 @@ public final class MobFarmController {
 
 	private static final double ITEM_SNAPSHOT_RADIUS = 5.0;
 	private static final double ITEM_DROP_DETECT_RADIUS = 8.0;
+	/** Used when {@link ClientLevel#getEntity(java.util.UUID)} is absent (early 1.21.x). */
+	private static final double ENTITY_BY_UUID_RADIUS = 256.0;
 
-	/** When non-null, we keep killing this entity type until /farmer stop. */
-	private static net.minecraft.world.entity.EntityType<?> huntType;
-
+	private static EntityType<?> huntType;
 	private static UUID targetId;
 	private static Boolean allowBreakBefore;
-
-	/** Last known position of the mob we were chasing (for drop detection). */
 	private static Vec3 lastMobPos;
-
-	/** Item entities near the mob the previous tick (baseline for drop diff). */
 	private static Set<UUID> lastItemUuidsNearMob = Collections.emptySet();
-
-	/** Specific {@link ItemEntity} UUIDs to collect (from our kills only). */
 	private static final Set<UUID> pendingItemPickups = new LinkedHashSet<>();
-
-	/** Saved while looting; Baritone follow uses GoalNear(radius) — default 3 is past vanilla pickup range. */
 	private static Integer followRadiusBeforeLoot;
-
 	private static Double followOffsetDistanceBeforeLoot;
 
 	public static void start(Player player, String mobArg, Consumer<String> onMessage) {
@@ -103,7 +96,7 @@ public final class MobFarmController {
 		}
 		Player player = mc.player;
 		ClientLevel level = mc.level;
-		prunePendingPickups(level);
+		prunePendingPickups(level, player.position());
 
 		if (!pendingItemPickups.isEmpty()) {
 			refreshBaritoneFollow();
@@ -128,8 +121,8 @@ public final class MobFarmController {
 		double reach = player.getAttributeValue(Attributes.ENTITY_INTERACTION_RANGE);
 		if (player.distanceTo(living) <= reach + 0.25) {
 			int slot = bestWeaponHotbarSlot(player);
-			if (slot >= 0 && slot != player.getInventory().getSelectedSlot()) {
-				player.getInventory().setSelectedSlot(slot);
+			if (slot >= 0 && slot != inventorySelectedSlot(player)) {
+				inventorySetSelectedSlot(player, slot);
 			}
 			player.lookAt(Anchor.EYES, living.getEyePosition(1f));
 			if (mc.gameMode != null && player.getAttackStrengthScale(0f) >= 0.92f) {
@@ -166,11 +159,41 @@ public final class MobFarmController {
 		return out;
 	}
 
-	private static void prunePendingPickups(ClientLevel level) {
-		pendingItemPickups.removeIf(id -> {
-			Entity e = level.getEntity(id);
+	private static void prunePendingPickups(ClientLevel level, Vec3 nearPlayer) {
+		Vec3 c = nearPlayer == null ? Vec3.ZERO : nearPlayer;
+		double r = ENTITY_BY_UUID_RADIUS;
+		AABB box = new AABB(c.x - r, c.y - r, c.z - r, c.x + r, c.y + r, c.z + r);
+		pendingItemPickups.removeIf(uuid -> {
+			Entity e = entityByUuidInBox(level, uuid, box);
 			return e == null || !e.isAlive();
 		});
+	}
+
+	private static Entity entityByUuidInBox(ClientLevel level, UUID uuid, AABB box) {
+		for (Entity e : level.getEntitiesOfClass(Entity.class, box, Entity::isAlive)) {
+			if (e.getUUID().equals(uuid)) {
+				return e;
+			}
+		}
+		return null;
+	}
+
+	private static Entity entityByUuidNear(ClientLevel level, UUID uuid, Vec3 center) {
+		try {
+			var m = level.getClass().getMethod("getEntity", UUID.class);
+			Object found = m.invoke(level, uuid);
+			if (found instanceof Entity e && e.isAlive()) {
+				return e;
+			}
+		} catch (NoSuchMethodException ignored) {
+		} catch (ReflectiveOperationException ignored) {
+		}
+		if (center == null) {
+			center = Vec3.ZERO;
+		}
+		double r = ENTITY_BY_UUID_RADIUS;
+		AABB box = new AABB(center.x - r, center.y - r, center.z - r, center.x + r, center.y + r, center.z + r);
+		return entityByUuidInBox(level, uuid, box);
 	}
 
 	private static void refreshBaritoneFollow() {
@@ -194,7 +217,6 @@ public final class MobFarmController {
 		}
 	}
 
-	/** Goal on the item's block (radius 0), matching Baritone's pickup mode. */
 	private static void applyBaritoneLootFollowSettings() {
 		var settings = BaritoneAPI.getSettings();
 		if (followRadiusBeforeLoot == null) {
@@ -220,8 +242,9 @@ public final class MobFarmController {
 	}
 
 	private static LivingEntity resolveHuntTarget(Minecraft mc, Player player) {
+		Vec3 hint = lastMobPos != null ? lastMobPos : player.position();
 		if (targetId != null) {
-			Entity e = mc.level.getEntity(targetId);
+			Entity e = entityByUuidNear(mc.level, targetId, hint);
 			if (e instanceof LivingEntity le && le.isAlive()) {
 				return le;
 			}
@@ -233,7 +256,7 @@ public final class MobFarmController {
 		}
 		acquireNextTarget(player);
 		if (targetId != null) {
-			Entity e = mc.level.getEntity(targetId);
+			Entity e = entityByUuidNear(mc.level, targetId, player.position());
 			if (e instanceof LivingEntity le && le.isAlive()) {
 				return le;
 			}
@@ -265,7 +288,7 @@ public final class MobFarmController {
 		refreshBaritoneFollow();
 	}
 
-	private static LivingEntity findNearest(Player player, net.minecraft.world.entity.EntityType<?> type, UUID exclude) {
+	private static LivingEntity findNearest(Player player, EntityType<?> type, UUID exclude) {
 		AABB box = player.getBoundingBox().inflate(192.0);
 		var nearby = player.level().getEntitiesOfClass(LivingEntity.class, box, e -> e != player && e.isAlive() && e.getType() == type && (exclude == null || !e.getUUID().equals(exclude)));
 		LivingEntity best = null;
@@ -280,16 +303,106 @@ public final class MobFarmController {
 		return best;
 	}
 
-	private static net.minecraft.world.entity.EntityType<?> resolveEntityType(String raw) {
+	private static EntityType<?> resolveEntityType(String raw) {
 		String s = raw.trim();
 		if (!s.contains(":")) {
 			s = "minecraft:" + s;
 		}
-		Identifier id = Identifier.tryParse(s);
-		if (id == null) {
+		for (ResourceKey<EntityType<?>> key : BuiltInRegistries.ENTITY_TYPE.registryKeySet()) {
+			try {
+				if (resourceKeyAsString(key).equals(s)) {
+					return entityTypeForKey(key);
+				}
+			} catch (ReflectiveOperationException ignored) {
+			}
+		}
+		return null;
+	}
+
+	private static String resourceKeyAsString(ResourceKey<?> key) throws ReflectiveOperationException {
+		try {
+			var m = key.getClass().getMethod("location");
+			return m.invoke(key).toString();
+		} catch (NoSuchMethodException e) {
+			var m = key.getClass().getMethod("identifier");
+			return m.invoke(key).toString();
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static EntityType<?> entityTypeForKey(ResourceKey<EntityType<?>> key) {
+		var reg = BuiltInRegistries.ENTITY_TYPE;
+		try {
+			var m = reg.getClass().getMethod("getHolder", ResourceKey.class);
+			Optional<?> opt = (Optional<?>) m.invoke(reg, key);
+			EntityType<?> from = holderOptionalToType(opt);
+			if (from != null) {
+				return from;
+			}
+		} catch (NoSuchMethodException ignored) {
+		} catch (ReflectiveOperationException ignored) {
+		}
+		try {
+			Object v = reg.getClass().getMethod("get", ResourceKey.class).invoke(reg, key);
+			if (v instanceof Optional<?> o) {
+				return holderOptionalToType(o);
+			}
+			if (v instanceof EntityType<?> et) {
+				return et;
+			}
+		} catch (NoSuchMethodException ignored) {
+		} catch (ReflectiveOperationException ignored) {
+		}
+		return null;
+	}
+
+	private static EntityType<?> holderOptionalToType(Optional<?> opt) {
+		if (opt == null || opt.isEmpty()) {
 			return null;
 		}
-		return BuiltInRegistries.ENTITY_TYPE.get(id).map(net.minecraft.core.Holder::value).orElse(null);
+		Object inner = opt.get();
+		if (inner instanceof EntityType<?> et) {
+			return et;
+		}
+		try {
+			var vm = inner.getClass().getMethod("value");
+			return (EntityType<?>) vm.invoke(inner);
+		} catch (ReflectiveOperationException e) {
+			return null;
+		}
+	}
+
+	private static int inventorySelectedSlot(Player player) {
+		var inv = player.getInventory();
+		try {
+			return (Integer) inv.getClass().getMethod("getSelectedSlot").invoke(inv);
+		} catch (NoSuchMethodException e) {
+			try {
+				var f = inv.getClass().getDeclaredField("selected");
+				f.setAccessible(true);
+				return f.getInt(inv);
+			} catch (ReflectiveOperationException e2) {
+				return 0;
+			}
+		} catch (ReflectiveOperationException e) {
+			return 0;
+		}
+	}
+
+	private static void inventorySetSelectedSlot(Player player, int slot) {
+		var inv = player.getInventory();
+		try {
+			inv.getClass().getMethod("setSelectedSlot", int.class).invoke(inv, slot);
+			return;
+		} catch (NoSuchMethodException e) {
+			try {
+				var f = inv.getClass().getDeclaredField("selected");
+				f.setAccessible(true);
+				f.setInt(inv, slot);
+			} catch (ReflectiveOperationException ignored) {
+			}
+		} catch (ReflectiveOperationException ignored) {
+		}
 	}
 
 	private static int bestWeaponHotbarSlot(Player player) {
