@@ -3,9 +3,9 @@
 	"id": "mobfarmer",
 	"version": "1.0.0",
 	"name": "Mob Farmer",
-	"description": "Client commands to path toward a mob with Meteor Baritone, then kill it with your strongest hotbar weapon.",
+	"description": "Client commands to path to mobs with Meteor Baritone, kill them, collect only their drops, then continue until /farmer stop.",
 	"authors": ["Farmer++"],
-	"license": "MIT",
+	"license": "LGPL-3.0",
 	"environment": "client",
 	"entrypoints": {
 		"main": ["net.mobfarmer.MobFarmer"],

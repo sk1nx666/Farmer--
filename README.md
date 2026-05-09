@@ -1,6 +1,6 @@
 # Mob Farmer
 
-Fabric **1.21.11** client mod: path to mobs with **[MeteorDevelopment Baritone](https://github.com/MeteorDevelopment/baritone)**, kill them in range with your best hotbar weapon (swords preferred over axes when both are present). Baritone **block breaking is disabled** while farming; farming runs until **`/farmer stop`**.
+Fabric **1.21.11** client mod: path to mobs with **[MeteorDevelopment Baritone](https://github.com/MeteorDevelopment/baritone)**, kill them in range with your best hotbar weapon (swords preferred over axes when both are present), then **pick up only loot from those kills** (not other ground items). Baritone **block breaking is disabled** while farming; farming runs until **`/farmer stop`**.
 
 ## Requirements
 
@@ -40,6 +40,6 @@ Put the built JAR in your instance `mods` folder together with Fabric API and Me
 
 ## License
 
-This project is licensed under the MIT License; see [LICENSE](LICENSE).
+This project is licensed under the **GNU LGPL v3.0**; see [LICENSE](LICENSE).
 
-Baritone is separate software (LGPL-3.0); use their distribution and terms for the pathfinding mod.
+Baritone is separate software (also LGPL-3.0); use their distribution for the pathfinding mod.
