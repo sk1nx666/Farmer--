@@ -44,9 +44,6 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Local tooling
-.cursor/
-
 # This project: local Baritone clone / optional compile path
 baritone-build/
 
