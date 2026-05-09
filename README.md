@@ -1,10 +1,10 @@
-# Mob Farmer
+# AutoFarmer
 
-Fabric **1.21.11** client mod: path to mobs with **[MeteorDevelopment Baritone](https://github.com/MeteorDevelopment/baritone)**, kill them in range with your best hotbar weapon (swords preferred over axes when both are present), then **pick up only loot from those kills** (not other ground items). Baritone **block breaking is disabled** while farming; farming runs until **`/farmer stop`**.
+Fabric client mod: path to mobs with **[MeteorDevelopment Baritone](https://github.com/MeteorDevelopment/baritone)**, kill them in range with your best hotbar weapon (swords preferred over axes when both are present), then **pick up the drops** Baritone **block breaking is disabled** while farming; farming runs until **`/farmer stop`**.
 
 ## Requirements
 
-- Minecraft **1.21.11**
+- Minecraft
 - **Java 21**
 - **Fabric Loader** ≥ **0.18.6**
 - **Fabric API**
