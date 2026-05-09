@@ -1,0 +1,21 @@
+{
+	"schemaVersion": 1,
+	"id": "mobfarmer",
+	"version": "${version}",
+	"name": "Mob Farmer",
+	"description": "Client commands to path toward a mob with Meteor Baritone, then kill it with your strongest hotbar weapon.",
+	"authors": ["Farmer++"],
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"main": ["net.mobfarmer.MobFarmer"],
+		"client": ["net.mobfarmer.client.MobFarmerClient"]
+	},
+	"depends": {
+		"fabricloader": ">=0.18.6",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*",
+		"baritone-meteor": "*"
+	}
+}

@@ -1,0 +1,58 @@
+plugins {
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+	id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+loom {
+	splitEnvironmentSourceSets()
+
+	mods {
+		"mobfarmer" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	mappings loom.officialMojangMappings()
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	def baritoneApi = [
+		file("${rootDir}/baritone-build/dist/baritone-api-fabric-${baritone_api_version}.jar"),
+		file("${rootDir}/baritone-build/fabric/build/libs/baritone-fabric-${baritone_api_version}.jar"),
+		file("${rootDir}/libs/baritone-api-fabric.jar"),
+	].find { it.exists() }
+	if (baritoneApi == null) {
+		throw new GradleException("Baritone jar not found. Option A: cd baritone-build && .\\gradlew.bat :fabric:remapJar  Option B: copy Meteor Baritone's API/mod jar to libs/baritone-api-fabric.jar")
+	}
+	modCompileOnly files(baritoneApi)
+}
+
+processResources {
+	inputs.property "version", project.version
+	filesMatching("fabric.mod.json") {
+		expand "version": inputs.properties.version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 21
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+jar {
+	from("LICENSE") {
+		rename { "${it}_${project.name}" }
+	}
+}
