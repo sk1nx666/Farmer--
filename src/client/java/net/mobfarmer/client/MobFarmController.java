@@ -47,6 +47,11 @@ public final class MobFarmController {
 	/** Specific {@link ItemEntity} UUIDs to collect (from our kills only). */
 	private static final Set<UUID> pendingItemPickups = new LinkedHashSet<>();
 
+	/** Saved while looting; Baritone follow uses GoalNear(radius) — default 3 is past vanilla pickup range. */
+	private static Integer followRadiusBeforeLoot;
+
+	private static Double followOffsetDistanceBeforeLoot;
+
 	public static void start(Player player, String mobArg, Consumer<String> onMessage) {
 		abortSessionSilently();
 		var type = resolveEntityType(mobArg);
@@ -79,6 +84,7 @@ public final class MobFarmController {
 	}
 
 	private static void abortSessionSilently() {
+		restoreBaritoneFollowTweaks();
 		restoreBaritoneBreakSetting();
 		huntType = null;
 		targetId = null;
@@ -172,10 +178,12 @@ public final class MobFarmController {
 			var baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
 			var follow = baritone.getFollowProcess();
 			if (!pendingItemPickups.isEmpty()) {
+				applyBaritoneLootFollowSettings();
 				Set<UUID> ids = Set.copyOf(pendingItemPickups);
 				follow.follow(e -> e.isAlive() && e instanceof ItemEntity && ids.contains(e.getUUID()));
 				return;
 			}
+			restoreBaritoneFollowTweaks();
 			if (targetId != null) {
 				UUID id = targetId;
 				follow.follow(e -> e.isAlive() && e.getUUID().equals(id));
@@ -183,6 +191,31 @@ public final class MobFarmController {
 			}
 			follow.cancel();
 		} catch (Throwable ignored) {
+		}
+	}
+
+	/** Goal on the item's block (radius 0), matching Baritone's pickup mode. */
+	private static void applyBaritoneLootFollowSettings() {
+		var settings = BaritoneAPI.getSettings();
+		if (followRadiusBeforeLoot == null) {
+			followRadiusBeforeLoot = settings.followRadius.value;
+		}
+		if (followOffsetDistanceBeforeLoot == null) {
+			followOffsetDistanceBeforeLoot = settings.followOffsetDistance.value;
+		}
+		settings.followRadius.value = 0;
+		settings.followOffsetDistance.value = 0.0;
+	}
+
+	private static void restoreBaritoneFollowTweaks() {
+		var settings = BaritoneAPI.getSettings();
+		if (followRadiusBeforeLoot != null) {
+			settings.followRadius.value = followRadiusBeforeLoot;
+			followRadiusBeforeLoot = null;
+		}
+		if (followOffsetDistanceBeforeLoot != null) {
+			settings.followOffsetDistance.value = followOffsetDistanceBeforeLoot;
+			followOffsetDistanceBeforeLoot = null;
 		}
 	}
 
