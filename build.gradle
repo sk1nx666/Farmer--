@@ -56,3 +56,17 @@ jar {
 		rename { "${it}_${project.name}" }
 	}
 }
+
+/** Remapped mod jar for GitHub releases: {@code libs/mobfarmer-<ver>-mc<Minecraft>.jar} */
+tasks.register('copyReleaseToLibs') {
+	dependsOn remapJar
+	group = 'build'
+	description = 'Copy remapped jar to libs/ for release uploads'
+	doLast {
+		copy {
+			from remapJar.archiveFile
+			into layout.projectDirectory.dir('libs')
+			rename { "mobfarmer-${project.version}-mc${project.minecraft_version}.jar" }
+		}
+	}
+}
