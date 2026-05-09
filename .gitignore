@@ -1,29 +1,58 @@
-# IDE
+# Gradle
+.gradle/
+build/
+out/
+classes/
+
+# Fabric / Loom
+run/
+remappedSrc/
+
+# Eclipse
+*.launch
+.settings/
+.metadata/
+bin/
+
+# IntelliJ / Android Studio
 .idea/
 *.iml
 *.ipr
 *.iws
-.project
-.classpath
-.settings/
-bin/
+*.jks
+
+# NetBeans
+.nb-gradle/
+
+# VS Code (local user settings; track `.vscode/` only if you commit shared tasks)
 .vscode/
+
+# Kotlin (if you add Kotlin sources later)
+.kotlin/
+
+# Java / JVM
+*.class
+hs_err_pid*
+replay_pid*
+
+# Logs
+*.log
+logs/
 
 # OS
 .Desktop.ini
 .DS_Store
 Thumbs.db
 
-# Tooling / local
+# Local tooling
 .cursor/
-*.log
 
-# Local Baritone clone or cached build (optional compile path)
+# This project: local Baritone clone / optional compile path
 baritone-build/
 
-# Baritone API jar is compile-only; obtain from Baritone releases or place manually (see README)
+# Compile-only Baritone API; place jar locally per README
 libs/*.jar
 
-# Accidental / scratch
+# Scratch / accidental
 mr.json
 *.download
